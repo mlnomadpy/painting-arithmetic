@@ -78,12 +78,30 @@ class Sample:
 # ---------------------------------------------------------------------------
 
 
+# Module-level cache of canonical result images — 91 × (28, 84) float32.
+# Looked up by index instead of re-rendered every sample.
+_ALL_TARGETS: np.ndarray | None = None
+
+
+def _all_targets() -> np.ndarray:
+    global _ALL_TARGETS
+    if _ALL_TARGETS is None:
+        _ALL_TARGETS = glyphs.render_all_results()
+    return _ALL_TARGETS
+
+
 class ArithmeticSource(grain.RandomAccessDataSource):
     """A Grain ``RandomAccessDataSource`` that materialises one
     ``(img_a, img_op, img_b, ...)`` sample at index ``idx``.
 
-    Despite the index, all sampling is fully randomised — ``idx`` only
-    seeds a per-sample RNG so iteration is deterministic and reproducible.
+    Two perf tricks keep ``__getitem__`` cheap enough to keep the GPU fed:
+
+    * **Glyph pool.** ``glyph_pool_size`` augmented operator glyphs per
+      operator are rendered once at init via PIL, then each sample picks
+      one by array indexing. PIL never appears on the hot path.
+    * **Target lookup.** The 91 canonical result images are pre-rendered
+      once at module load (see :func:`_all_targets`); samples index into
+      that stack instead of re-rendering.
     """
 
     def __init__(
@@ -92,11 +110,29 @@ class ArithmeticSource(grain.RandomAccessDataSource):
         length: int,
         seed: int,
         augment_op: bool = True,
+        glyph_pool_size: int = 2000,
     ):
         self._bins = bins
         self._length = int(length)
         self._seed = seed
         self._augment_op = augment_op
+
+        pool_rng = random.Random(seed * 31 + 7)
+        pool_size = glyph_pool_size if augment_op else 4
+        self._glyph_pool: list[np.ndarray] = []
+        for op_idx in range(4):
+            arrs = []
+            for _ in range(pool_size):
+                pil = (
+                    glyphs.render_glyph_augmented(op_idx, pool_rng)
+                    if augment_op
+                    else glyphs.render_glyph_clean(op_idx)
+                )
+                a = np.asarray(pil, dtype=np.float32) / 255.0
+                a = (a - MNIST_MEAN) / MNIST_STD
+                arrs.append(a)
+            self._glyph_pool.append(np.stack(arrs))
+        self._targets = _all_targets()
 
     def __len__(self) -> int:
         return self._length
@@ -115,21 +151,16 @@ class ArithmeticSource(grain.RandomAccessDataSource):
         elif glyphs.OPS[op] == "*":  r = a * b
         else:                         r = a // b
 
-        # Operator glyph (augmented or canonical).
-        op_pil = (
-            glyphs.render_glyph_augmented(op, rng)
-            if self._augment_op
-            else glyphs.render_glyph_clean(op)
-        )
-        op_arr = np.asarray(op_pil, dtype=np.float32) / 255.0
-        op_arr = (op_arr - MNIST_MEAN) / MNIST_STD
+        # Operator glyph — array lookup from the pre-rendered pool.
+        gp = self._glyph_pool[op]
+        op_arr = gp[rng.randrange(gp.shape[0])]
 
         # Operand digit crops.
         ia = self._bins[a][int(nprng.integers(0, self._bins[a].shape[0]))]
         ib = self._bins[b][int(nprng.integers(0, self._bins[b].shape[0]))]
 
-        # Target image as float32 [0, 1].
-        target = glyphs.render_result_image(r).astype(np.float32) / 255.0
+        # Target image — pre-rendered lookup.
+        target = self._targets[r - glyphs.RESULT_MIN]
 
         sign_lbl, tens_lbl, units_lbl = glyphs.slot_labels(r)
         absr = abs(r)
@@ -202,7 +233,7 @@ def build_loader(
     shuffle: bool = True,
     num_epochs: int = 1,
     seed: int = 0,
-    num_workers: int = 0,
+    num_workers: int = 2,
 ) -> Iterator[dict[str, np.ndarray]]:
     """Wrap a source in a Grain DataLoader.
 
