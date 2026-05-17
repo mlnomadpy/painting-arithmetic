@@ -141,7 +141,11 @@ md(r"""
 """)
 
 code(r"""
-USE_YAT_ENCODER = True   # toggle: False reverts to stock Conv+GELU
+# Encoder choice — keep `False` (stock Conv+GELU) for the validated 96.91%
+# OCR recipe. `True` swaps in YatConv2D everywhere (more interpretable in
+# principle, but currently plateaus around 29% OCR at the same training
+# budget; needs LR/init tuning we haven't done).
+USE_YAT_ENCODER = False
 EMB_DIM, HIDDEN = 64, 256
 
 model = YatArithmeticGen(emb_dim=EMB_DIM, hidden=HIDDEN,

@@ -101,7 +101,7 @@ img_b   ─┘    (Yat conv or                      ℝ¹⁹²        ℝ²⁵�
                                                                         (training-only)
 ```
 
-- **Encoder.** Shared across all three input slots. Two variants — `YatEncoder` (every conv is a `YatConv` rational kernel, default) or `StockEncoder` (stock `Conv + GELU`). Both end with global average pool → linear → 64-d embedding.
+- **Encoder.** Shared across all three input slots. Two variants — `StockEncoder` (stock `Conv + GELU`, **default and validated** at 96.91% OCR) or `YatEncoder` (every conv is a `YatConv` rational kernel; experimental, currently underperforms at the same recipe — see the model docstring). Both end with global average pool → linear → 64-d embedding.
 - **Trunk.** Two `YatNMN` layers (`192 → 256 → 256`). The Yat kernel computes `α(x·W + b)² / (‖x − W‖² + ε)`, which makes each row of `W` a literal prototype point in input space. That's what makes the prototype-gallery interpretability work.
 - **Decoder.** Linear projection → 16×7×21 feature map → two `ConvTranspose` upsamples → `Conv → sigmoid` → 28×84 image.
 - **Auxiliary heads (training only).** A 14-way symbol classifier on each input embedding; modular CRT classifiers (mod 2, mod 5, mod 11, sign) on the trunk; per-slot classifiers (sign, tens, units) on the trunk. The per-slot CE is the load-bearing fix for the multi-digit collapse failure mode — removing it costs about 34 OCR points.

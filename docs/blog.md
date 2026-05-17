@@ -52,7 +52,7 @@ $$
 
 Two facts make this useful here. First, each row $W_u$ is literally a *prototype point* in input space: the denominator goes to zero when $x$ approaches $W_u$. Second, the numerator additionally rewards directional alignment, so each unit's receptive field is both localised and directional. Two stacked Yat layers chain prototype-matching.
 
-Every conv layer in the encoder is also a `YatConv` rational kernel by default. The decoder is intentionally small: a linear projection, two `ConvTranspose` upsamples, sigmoid. 0.81 M parameters total.
+The encoder uses stock `Conv + GELU` blocks by default — that's the validated recipe that reaches 96.91 % OCR. The library exposes a `YatEncoder` variant in which every conv is a `YatConv` rational kernel; in principle each filter then becomes an interpretable prototype patch, but at the same training budget the YatConv encoder currently plateaus near 29 % OCR. We treat it as an open research follow-up rather than the default. The decoder is intentionally small: a linear projection, two `ConvTranspose` upsamples, sigmoid. 0.81 M parameters total.
 
 ## 4. Why naïve training fails (and how to fix it)
 

@@ -6,10 +6,13 @@ heads (sym, mod CRT, slot) live on the trunk and are only used inside
 
 Two encoder variants are available behind the ``use_yat_encoder`` flag:
 
-* ``False``  — stock ``nnx.Conv + GELU`` blocks.
-* ``True``   — ``YatConv`` everywhere. Same parameter count (YatConv adds only
+* ``False`` (default) — stock ``nnx.Conv + GELU`` blocks. **This is the
+  validated recipe** — at 25 epochs × 60k samples it reaches ~96.91 % OCR.
+* ``True``  — ``YatConv`` everywhere. Same parameter count (YatConv adds only
   per-channel ``alpha``), no extra activation needed because the rational
-  kernel is already nonlinear.
+  kernel is already nonlinear. **Currently experimental**: with the same
+  training recipe it plateaus around ~29 % OCR. Likely needs different LR /
+  init than the stock encoder; treat as an open research follow-up.
 """
 
 from __future__ import annotations
@@ -142,7 +145,7 @@ class YatArithmeticGen(nnx.Module):
         self,
         emb_dim: int = 64,
         hidden: int = 256,
-        use_yat_encoder: bool = True,
+        use_yat_encoder: bool = False,
         *,
         rngs: nnx.Rngs,
     ):

@@ -46,7 +46,10 @@ class TrainConfig:
     weight_decay: float = 1e-4
     warmup_frac: float = 0.05
     seed: int = 0
-    use_yat_encoder: bool = True
+    # Stock Conv+GELU encoder is the validated path (96.91% OCR at 25
+    # epochs × 60k samples). YatConv encoder (use_yat_encoder=True) is
+    # experimental and currently underperforms — see model.py docstring.
+    use_yat_encoder: bool = False
     loss: LossWeights = field(default_factory=LossWeights)
     data_root: str = "./data"
     ckpt_dir: str = "./ckpts"
@@ -211,8 +214,10 @@ def main():
     p.add_argument("--batch-size", type=int, default=256)
     p.add_argument("--lr", type=float, default=2e-3)
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--no-yat-encoder", action="store_true",
-                   help="use stock Conv+GELU encoder instead of YatConv")
+    p.add_argument("--yat-encoder", action="store_true",
+                   help="EXPERIMENTAL: use YatConv encoder instead of stock "
+                        "Conv+GELU. Currently underperforms (~29%% OCR vs "
+                        "~97%% with the stock encoder at the same recipe).")
     p.add_argument("--data-root", default="./data")
     p.add_argument("--ckpt-dir", default="./ckpts")
     args = p.parse_args()
@@ -224,7 +229,7 @@ def main():
         batch_size=args.batch_size,
         lr=args.lr,
         seed=args.seed,
-        use_yat_encoder=not args.no_yat_encoder,
+        use_yat_encoder=args.yat_encoder,
         data_root=args.data_root,
         ckpt_dir=args.ckpt_dir,
     )
