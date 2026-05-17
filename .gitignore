@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.so
+
+# venvs
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data + checkpoints
+.data/
+data/
+*.npz
+*.pt
+*.pkl
+ckpts/
+checkpoints/
+
+# Generated assets
+viz_assets/
+runs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

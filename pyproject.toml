@@ -1,0 +1,67 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "painting-arithmetic"
+version = "0.1.0"
+description = "A tiny rational-kernel network that does single-digit MNIST arithmetic and paints the answer as an image. JAX / NNX / Grain."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Taha Bouhsine" }]
+keywords = [
+    "jax",
+    "flax",
+    "nnx",
+    "grain",
+    "mnist",
+    "interpretability",
+    "rational-kernel",
+    "yat",
+    "world-model",
+]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "jax>=0.4.30",
+    "flax>=0.10.0",
+    "optax>=0.2.0",
+    "grain>=0.2.0",
+    "torchvision>=0.17",   # for MNIST download only
+    "numpy>=1.26",
+    "pillow>=10.0",
+    "matplotlib>=3.7",
+    "tqdm>=4.66",
+    "nmn @ git+https://github.com/azettaai/nmn.git",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "ipykernel", "jupyter"]
+demo = ["fastapi", "uvicorn", "python-multipart"]
+
+[project.scripts]
+painting-arithmetic-train = "painting_arithmetic.train:main"
+painting-arithmetic-eval  = "painting_arithmetic.eval:main"
+
+[project.urls]
+Homepage = "https://github.com/mlnomadpy/painting-arithmetic"
+Source = "https://github.com/mlnomadpy/painting-arithmetic"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/painting_arithmetic"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]   # we accept long math lines
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
