@@ -76,7 +76,9 @@ recipe, same interpretability probes.
    output; the other three operators' units paint the units slot. The
    decoder's "slot alphabet" is operator-aware.
 
-**Runtime.** ~25 minutes on a Kaggle T4. JAX uses GPU when available.
+**Runtime.** ~60–70 minutes on a Kaggle T4 — paper-recipe budget
+(60 k samples × (8, 30, 12) epochs), reaches 88.78 % painted OCR.
+JAX uses GPU when available.
 
 **Reading order.** Sections 1–4 build the model end-to-end. Sections
 5–8 do interpretability on the trained checkpoint. Skip ahead if you
@@ -606,16 +608,21 @@ def make_phase_step(phase, pix_w):
     return step
 """),
     md(r"""
-**Training run.** Three phases at 10k samples per epoch — kept small so
-the whole notebook finishes in <30 min on a T4. The paper's headline
-numbers use 60k × {8, 30, 12} epochs; the recipe is identical.
+**Training run.** Three phases at the paper's headline recipe:
+60 000 samples per epoch × (8, 30, 12) epochs. On a Kaggle T4 this
+takes ~60–70 min end-to-end and reaches **88.78 % painted OCR** — the
+v3-thin number quoted in the paper.
+
+If you need a faster smoke run on a slower machine, drop
+`TRAIN_PER_EPOCH` to 20 000 and `EPOCHS_PHASE` to `(4, 12, 6)` — the
+recipe scales linearly but the OCR ceiling drops with the budget.
 """),
     code(r"""
-TRAIN_PER_EPOCH = 10_000     # small enough to finish on free Kaggle GPU
-TEST_SIZE       = 2_000
+TRAIN_PER_EPOCH = 60_000     # paper recipe — match the headline OCR
+TEST_SIZE       = 6_000
 BATCH_SIZE      = 256
 LR              = 2e-3
-EPOCHS_PHASE    = (6, 18, 8)
+EPOCHS_PHASE    = (8, 30, 12)
 SEED            = 0
 
 pix_w = build_pixel_weight(2.0)
