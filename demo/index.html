@@ -123,7 +123,7 @@ no softmax. JAX-trained, ONNX-served in your browser.</p>
 <p class="footer">model: <code>./model.onnx</code>  ·
 code: <a style="color:var(--accent-2)" href="https://github.com/mlnomadpy/painting-arithmetic">github.com/mlnomadpy/painting-arithmetic</a></p>
 
-<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.js"></script>
 <script>
 const OP_GLYPHS = ["+", "−", "×", "÷"];
 const MNIST_MEAN = 0.1307, MNIST_STD = 0.3081;
@@ -259,7 +259,7 @@ let session = null;
 async function loadModel() {
   try {
     ort.env.wasm.numThreads = 1;
-    ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/";
+    ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/";
     session = await ort.InferenceSession.create("./model.onnx",
                                                  { executionProviders: ["wasm"] });
     document.getElementById("status").textContent = "model loaded · draw something";
