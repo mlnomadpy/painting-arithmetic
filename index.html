@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painting Arithmetic — live demo</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #151821; --panel-2: #1c2030;
+    --ink: #e6e8ee; --muted: #9aa3b2;
+    --accent: #ffb86b; --accent-2: #8be9fd;
+    --good: #a5e075; --bad: #ff7a7a;
+    --line: #2a2f3d;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--ink); margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  body { max-width: 1080px; margin: 0 auto; padding: 32px 24px 96px; }
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .lede { color: var(--muted); margin: 0 0 12px; }
+  code, .mono { font-family: var(--mono); font-size: 13.5px; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px;
+          font-size: 12px; background: var(--panel-2); color: var(--accent-2);
+          border: 1px solid var(--line); margin-bottom: 12px; }
+
+  .stage {
+    display: flex; gap: 14px; align-items: center; justify-content: center;
+    flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 22px 18px; margin: 12px 0 14px;
+  }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .cell label { font-size: 11px; color: var(--muted); font-family: var(--mono);
+                text-transform: uppercase; letter-spacing: 0.06em; }
+  canvas.pad {
+    background: #000; border-radius: 12px; border: 1px solid #222;
+    box-shadow: inset 0 0 0 1px #2c2c2c;
+    touch-action: none; cursor: crosshair; image-rendering: pixelated;
+  }
+  .arrow { color: var(--muted); font-size: 28px; padding: 0 4px; }
+  canvas.out {
+    width: 504px; height: 168px; background: #000; border-radius: 12px;
+    border: 1px solid #2c3a55; box-shadow: inset 0 0 0 1px #2c2c2c;
+    image-rendering: pixelated;
+  }
+  .ocr {
+    font-family: var(--mono); color: var(--good); font-size: 36px;
+    font-weight: 700; line-height: 1; padding-top: 6px;
+  }
+  .glyph-row { display: flex; gap: 6px; justify-content: center;
+               margin-bottom: 14px; flex-wrap: wrap; }
+  .glyph-row .label { color: var(--muted); font-family: var(--mono); font-size: 12px;
+                      align-self: center; padding-right: 4px; }
+  .glyph-row button {
+    background: var(--panel-2); color: var(--ink); border: 1px solid var(--line);
+    font-family: var(--mono); font-size: 18px; font-weight: 700;
+    width: 44px; height: 44px; border-radius: 8px; cursor: pointer;
+  }
+  .controls { display: flex; gap: 10px; justify-content: center;
+              margin-bottom: 12px; flex-wrap: wrap; }
+  .controls button {
+    background: var(--panel-2); color: var(--ink); border: 1px solid var(--line);
+    padding: 10px 14px; border-radius: 8px; cursor: pointer; font-size: 14px;
+    font-family: inherit;
+  }
+  .controls .primary {
+    background: var(--accent); color: #1a1a1a; border-color: var(--accent);
+    font-weight: 600;
+  }
+  .status { color: var(--muted); font-family: var(--mono); font-size: 12px;
+            min-height: 18px; text-align: center; }
+  .footer { color: var(--muted); font-size: 12px; margin-top: 32px;
+            text-align: center; font-family: var(--mono); }
+  .badge { color: var(--bad); }
+</style>
+</head>
+<body>
+
+<span class="pill">painting-arithmetic · live</span>
+<h1>The model paints its answer</h1>
+<p class="lede">Three drawing pads → shared CNN encoder → Yat trunk →
+ConvTranspose decoder → a 28×84 image of the result. Pure latent space,
+no softmax. JAX-trained, ONNX-served in your browser.</p>
+
+<div class="stage">
+  <div class="cell">
+    <label>digit a</label>
+    <canvas class="pad" id="padA" width="280" height="280"></canvas>
+  </div>
+  <div class="cell">
+    <label>operator</label>
+    <canvas class="pad" id="padOp" width="280" height="280"></canvas>
+  </div>
+  <div class="cell">
+    <label>digit b</label>
+    <canvas class="pad" id="padB" width="280" height="280"></canvas>
+  </div>
+  <div class="arrow">→</div>
+  <div class="cell">
+    <label>generated</label>
+    <canvas class="out" id="outCanvas" width="84" height="28"></canvas>
+    <div class="ocr"><span id="ocrText">·</span></div>
+  </div>
+</div>
+
+<div class="glyph-row">
+  <span class="label">paint operator:</span>
+  <button data-op="0">+</button>
+  <button data-op="1">−</button>
+  <button data-op="2">×</button>
+  <button data-op="3">÷</button>
+</div>
+
+<div class="controls">
+  <button class="primary" id="btnPredict">Predict</button>
+  <button id="btnClearA">Clear A</button>
+  <button id="btnClearOp">Clear op</button>
+  <button id="btnClearB">Clear B</button>
+</div>
+<div class="status" id="status">loading model…</div>
+
+<p class="footer">model: <code>./model.onnx</code>  ·
+code: <a style="color:var(--accent-2)" href="https://github.com/mlnomadpy/painting-arithmetic">github.com/mlnomadpy/painting-arithmetic</a></p>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
+<script>
+const OP_GLYPHS = ["+", "−", "×", "÷"];
+const MNIST_MEAN = 0.1307, MNIST_STD = 0.3081;
+
+class Pad {
+  constructor(canvas, onChange) {
+    this.canvas = canvas; this.ctx = canvas.getContext("2d", { willReadFrequently: true });
+    this.onChange = onChange; this.drawing = false; this.dirty = false;
+    this.clear();
+    canvas.addEventListener("pointerdown", e => this._start(e));
+    canvas.addEventListener("pointermove", e => this._move(e));
+    canvas.addEventListener("pointerup",   e => this._end(e));
+    canvas.addEventListener("pointercancel", e => this._end(e));
+    canvas.addEventListener("pointerleave", e => this._end(e));
+  }
+  clear() {
+    this.ctx.fillStyle = "#000";
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.dirty = false; this.lastX = null; this.lastY = null;
+  }
+  paintGlyph(opIdx) {
+    this.clear();
+    const c = this.ctx;
+    c.fillStyle = "#fff";
+    c.font = "bold 200px -apple-system, Arial, sans-serif";
+    c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillText(OP_GLYPHS[opIdx], this.canvas.width / 2, this.canvas.height / 2 + 4);
+    this.dirty = true;
+    if (this.onChange) this.onChange();
+  }
+  _pos(ev) {
+    const r = this.canvas.getBoundingClientRect();
+    return { x: (ev.clientX - r.left) * (this.canvas.width / r.width),
+             y: (ev.clientY - r.top)  * (this.canvas.height / r.height) };
+  }
+  _start(ev) { this.canvas.setPointerCapture(ev.pointerId); this.drawing = true;
+               const p = this._pos(ev); this.lastX = p.x; this.lastY = p.y;
+               this._stroke(p.x, p.y, p.x, p.y); }
+  _move(ev) { if (!this.drawing) return; const p = this._pos(ev);
+              this._stroke(this.lastX, this.lastY, p.x, p.y);
+              this.lastX = p.x; this.lastY = p.y; }
+  _end(_ev) { if (!this.drawing) return; this.drawing = false;
+              this.lastX = null; this.lastY = null;
+              if (this.onChange) this.onChange(); }
+  _stroke(x0, y0, x1, y1) {
+    const c = this.ctx;
+    c.strokeStyle = "#fff"; c.lineWidth = 22; c.lineCap = "round"; c.lineJoin = "round";
+    c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+    this.dirty = true;
+  }
+  tensor() {
+    const W = this.canvas.width, H = this.canvas.height;
+    const src = this.ctx.getImageData(0, 0, W, H).data;
+    let minX = W, minY = H, maxX = -1, maxY = -1;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const idx = (y * W + x) * 4;
+      if (src[idx] > 16) {
+        if (x < minX) minX = x; if (y < minY) minY = y;
+        if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+      }
+    }
+    const out = new Float32Array(28 * 28);
+    const bg = (0 - MNIST_MEAN) / MNIST_STD;
+    if (maxX < 0) { out.fill(bg); return out; }
+    const side = Math.max(maxX - minX + 1, maxY - minY + 1);
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    const half = side / 2 + 8;
+    const tmp = document.createElement("canvas"); tmp.width = 28; tmp.height = 28;
+    const tctx = tmp.getContext("2d", { willReadFrequently: true });
+    tctx.imageSmoothingEnabled = true; tctx.imageSmoothingQuality = "high";
+    tctx.fillStyle = "#000"; tctx.fillRect(0, 0, 28, 28);
+    tctx.drawImage(this.canvas, cx - half, cy - half, half * 2, half * 2, 4, 4, 20, 20);
+    const data = tctx.getImageData(0, 0, 28, 28).data;
+    for (let i = 0; i < 28 * 28; i++) {
+      out[i] = (data[i * 4] / 255 - MNIST_MEAN) / MNIST_STD;
+    }
+    return out;
+  }
+  isEmpty() { return !this.dirty; }
+}
+
+// Render target images for OCR (nearest-neighbour over 91 canonicals).
+function renderGlyph28(text) {
+  const c = document.createElement("canvas"); c.width = 28; c.height = 28;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, 28, 28);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 22px Arial, Helvetica, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(text, 14, 14);
+  const data = ctx.getImageData(0, 0, 28, 28).data;
+  const arr = new Float32Array(28 * 28);
+  for (let i = 0; i < 28 * 28; i++) arr[i] = data[i * 4] / 255;
+  return arr;
+}
+const G = { blank: new Float32Array(28 * 28), minus: renderGlyph28("−") };
+for (let d = 0; d < 10; d++) G[d] = renderGlyph28(String(d));
+function buildResult(r) {
+  const out = new Float32Array(28 * 84);
+  const slots = [G.blank, G.blank, G.blank];
+  if (r < 0) { slots[0] = G.minus; r = -r; }
+  if (r >= 10) slots[1] = G[Math.floor(r / 10)];
+  slots[2] = G[r % 10];
+  for (let row = 0; row < 28; row++)
+    for (let s = 0; s < 3; s++)
+      for (let col = 0; col < 28; col++)
+        out[row * 84 + s * 28 + col] = slots[s][row * 28 + col];
+  return out;
+}
+const TARGETS = [];
+for (let r = -9; r <= 81; r++) TARGETS.push({ r, img: buildResult(r) });
+function ocr(pred) {
+  let bd = Infinity, br = 0;
+  for (const t of TARGETS) {
+    let d = 0;
+    for (let i = 0; i < 28 * 84; i++) { const x = pred[i] - t.img[i]; d += x * x; }
+    if (d < bd) { bd = d; br = t.r; }
+  }
+  return br;
+}
+function drawFloat(canvas, arr, w, h) {
+  const ctx = canvas.getContext("2d");
+  const img = ctx.createImageData(w, h);
+  for (let i = 0; i < w * h; i++) {
+    const v = Math.max(0, Math.min(255, Math.round(arr[i] * 255)));
+    img.data[i * 4] = v; img.data[i * 4 + 1] = v;
+    img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+let session = null;
+async function loadModel() {
+  try {
+    ort.env.wasm.numThreads = 1;
+    ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/";
+    session = await ort.InferenceSession.create("./model.onnx",
+                                                 { executionProviders: ["wasm"] });
+    document.getElementById("status").textContent = "model loaded · draw something";
+  } catch (e) {
+    document.getElementById("status").textContent = "model load failed: " + e.message;
+    document.getElementById("status").className = "status badge";
+  }
+}
+
+const padA  = new Pad(document.getElementById("padA"),  predict);
+const padOp = new Pad(document.getElementById("padOp"), predict);
+const padB  = new Pad(document.getElementById("padB"),  predict);
+
+async function predict() {
+  if (!session) return;
+  if (padA.isEmpty() && padOp.isEmpty() && padB.isEmpty()) return;
+  const ta = new ort.Tensor("float32", padA.tensor(),  [1, 1, 28, 28]);
+  const to = new ort.Tensor("float32", padOp.tensor(), [1, 1, 28, 28]);
+  const tb = new ort.Tensor("float32", padB.tensor(),  [1, 1, 28, 28]);
+  let r;
+  try {
+    r = await session.run({ img_a: ta, img_op: to, img_b: tb });
+  } catch (e) {
+    document.getElementById("status").textContent = "inference failed: " + e.message;
+    return;
+  }
+  const img = new Float32Array(r.img.data);
+  drawFloat(document.getElementById("outCanvas"), img, 84, 28);
+  document.getElementById("ocrText").textContent = String(ocr(img));
+}
+
+document.querySelectorAll(".glyph-row button").forEach(b =>
+  b.addEventListener("click", () => padOp.paintGlyph(+b.dataset.op)));
+document.getElementById("btnPredict").addEventListener("click", predict);
+document.getElementById("btnClearA").addEventListener("click",
+  () => { padA.clear(); document.getElementById("ocrText").textContent = "·"; });
+document.getElementById("btnClearOp").addEventListener("click",
+  () => { padOp.clear(); document.getElementById("ocrText").textContent = "·"; });
+document.getElementById("btnClearB").addEventListener("click",
+  () => { padB.clear(); document.getElementById("ocrText").textContent = "·"; });
+
+loadModel();
+</script>
+</body>
+</html>
