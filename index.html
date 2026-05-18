@@ -256,16 +256,28 @@ function drawFloat(canvas, arr, w, h) {
 }
 
 let session = null;
+function describeError(e) {
+  if (e == null) return "unknown";
+  if (typeof e === "string") return e;
+  if (e instanceof Error) return e.message || e.name || String(e);
+  try { return JSON.stringify(e); } catch (_) { return String(e); }
+}
 async function loadModel() {
+  const $s = document.getElementById("status");
   try {
     ort.env.wasm.numThreads = 1;
     ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/";
-    session = await ort.InferenceSession.create("./model.onnx",
-                                                 { executionProviders: ["wasm"] });
-    document.getElementById("status").textContent = "model loaded · draw something";
+    $s.textContent = "fetching model…";
+    const resp = await fetch("./model.onnx");
+    if (!resp.ok) throw new Error("fetch " + resp.status + " " + resp.statusText);
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    $s.textContent = "initialising runtime (" + (buf.length >> 20) + " MB)…";
+    session = await ort.InferenceSession.create(buf, { executionProviders: ["wasm"] });
+    $s.textContent = "model loaded · draw something";
   } catch (e) {
-    document.getElementById("status").textContent = "model load failed: " + e.message;
-    document.getElementById("status").className = "status badge";
+    console.error("loadModel failed:", e);
+    $s.textContent = "model load failed: " + describeError(e);
+    $s.className = "status badge";
   }
 }
 
