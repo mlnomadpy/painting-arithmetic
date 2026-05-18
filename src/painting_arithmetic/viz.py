@@ -177,10 +177,12 @@ def prototype_winners(
             break
     if W is None:
         raise RuntimeError("could not find h1 kernel weight")
-    # NNX stores (in, out); transpose to (out, in).
-    if W.shape[0] != lib_emb.shape[-1] * 3:
+    # NNX stores (in, out); transpose so each row is a unit's prototype.
+    if W.shape[1] != lib_emb.shape[-1] * 3:
         W = W.T
-    assert W.shape[1] == lib_emb.shape[-1] * 3
+    assert W.shape[1] == lib_emb.shape[-1] * 3, (
+        f"unexpected h1 kernel shape {W.shape}; expected last dim {lib_emb.shape[-1] * 3}"
+    )
     H = W.shape[0]
 
     W_a, W_op, W_b = W[:, :64], W[:, 64:128], W[:, 128:]
