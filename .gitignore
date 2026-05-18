@@ -24,11 +24,15 @@ data/
 *.pt
 *.pkl
 ckpts/
+ckpts_*/
 checkpoints/
 
 # Generated assets
 viz_assets/
 runs/
+
+# PySR / Julia scratch
+outputs/
 
 # OS
 .DS_Store
