@@ -1,0 +1,110 @@
+[
+  {
+    "op": "+",
+    "unit": 200,
+    "purity": 1.0,
+    "r2": 0.265217809145329,
+    "expr": "(square(x0) * 0.015016202) + 1.235413",
+    "complexity": 8,
+    "success": false
+  },
+  {
+    "op": "+",
+    "unit": 243,
+    "purity": 1.0,
+    "r2": 0.5143561567750491,
+    "expr": "x1 / abs(square(x1) + -7.8777347)",
+    "complexity": 8,
+    "success": false
+  },
+  {
+    "op": "+",
+    "unit": 14,
+    "purity": 1.0,
+    "r2": 0.16876152731289595,
+    "expr": "square((x1 * -0.014975672) + 2.0387497)",
+    "complexity": 8,
+    "success": false
+  },
+  {
+    "op": "-",
+    "unit": 20,
+    "purity": 1.0,
+    "r2": 0.3217728191852306,
+    "expr": "abs(square(square(x0) * 0.021201428) + -0.7778599)",
+    "complexity": 10,
+    "success": false
+  },
+  {
+    "op": "-",
+    "unit": 7,
+    "purity": 1.0,
+    "r2": 0.08027378699941212,
+    "expr": "0.7269115",
+    "complexity": 2,
+    "success": false
+  },
+  {
+    "op": "-",
+    "unit": 163,
+    "purity": 1.0,
+    "r2": 0.3728255842594089,
+    "expr": "square((x0 * 0.055277944) - 1.2143621)",
+    "complexity": 8,
+    "success": false
+  },
+  {
+    "op": "*",
+    "unit": 88,
+    "purity": 1.0,
+    "r2": 0.2896918960493111,
+    "expr": "(x1 * -0.11769557) - -3.005576",
+    "complexity": 7,
+    "success": false
+  },
+  {
+    "op": "*",
+    "unit": 201,
+    "purity": 1.0,
+    "r2": 0.26134568102540634,
+    "expr": "(x1 * -0.24795097) - -6.6700783",
+    "complexity": 7,
+    "success": false
+  },
+  {
+    "op": "*",
+    "unit": 166,
+    "purity": 1.0,
+    "r2": 0.3591006263153018,
+    "expr": "(x0 * 0.25178447) + 3.4625142",
+    "complexity": 7,
+    "success": false
+  },
+  {
+    "op": "//",
+    "unit": 38,
+    "purity": 1.0,
+    "r2": 0.4621535515028592,
+    "expr": "(x0 + x1) / (x1 + 1.1406028)",
+    "complexity": 8,
+    "success": false
+  },
+  {
+    "op": "//",
+    "unit": 241,
+    "purity": 1.0,
+    "r2": 0.07022151290848899,
+    "expr": "1.6497926",
+    "complexity": 2,
+    "success": false
+  },
+  {
+    "op": "//",
+    "unit": 174,
+    "purity": 1.0,
+    "r2": 0.1171425271012706,
+    "expr": "x0 / (x0 + -0.29798096)",
+    "complexity": 6,
+    "success": false
+  }
+]
