@@ -51,16 +51,29 @@ pip install -e .
 
 ## Train
 
+Two training modes share one CLI:
+
 ```bash
-# Default config (15 epochs, 30k samples per epoch). ~3 min on a Kaggle T4.
-painting-arithmetic-train --epochs 15
+# Phased curriculum (default). Three stages with stop_gradient cuts so
+# pixel supervision can't leak into the encoder or the trunk:
+#   phase 1 — encoder + aux_sym             (CE on 14 symbols)
+#   phase 2 — frozen encoder, train trunk   (CE on modular + per-slot heads)
+#   phase 3 — frozen encoder + trunk        (BCE on the painted target image)
+painting-arithmetic-train --phase all --epochs-1 8 --epochs-2 15 --epochs-3 8
 
-# Reproduce the full paper number (~13 min on Apple MPS, ~5 min on a T4).
-painting-arithmetic-train --epochs 25 --train-size 60000
+# Or run a single stage; phase 2/3 auto-load the prior phase's ckpt.
+painting-arithmetic-train --phase 1 --epochs 8
+painting-arithmetic-train --phase 2 --epochs 15
+painting-arithmetic-train --phase 3 --epochs 8
 
-# Toggle the encoder: --no-yat-encoder reverts to stock Conv+GELU.
-painting-arithmetic-train --no-yat-encoder
+# Legacy joint training (single pass, all heads at once).
+painting-arithmetic-train --phase joint --epochs 25 --train-size 60000
+
+# YatConv encoder (experimental, underperforms stock at this recipe).
+painting-arithmetic-train --phase all --yat-encoder
 ```
+
+Per-phase checkpoints are written to `ckpts/phase{1,2,3}.npz`; the final model is also copied to `ckpts/model.npz` for the demo and eval scripts.
 
 ## Evaluate a checkpoint
 
