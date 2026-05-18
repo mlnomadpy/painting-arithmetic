@@ -146,13 +146,18 @@ class YatArithmeticGen(nnx.Module):
         emb_dim: int = 64,
         hidden: int = 256,
         use_yat_encoder: bool = False,
+        single_yat: bool = False,
         *,
         rngs: nnx.Rngs,
     ):
         self.encoder = (YatEncoder if use_yat_encoder else StockEncoder)(emb_dim, rngs=rngs)
         fused = 3 * emb_dim
         self.h1 = YatNMN(fused, hidden, rngs=rngs)
-        self.h2 = YatNMN(hidden, hidden, rngs=rngs)
+        # ``single_yat=True`` collapses the trunk to one Yat layer. The
+        # h₂ slot becomes ``None`` so prototype↔unit mapping in h₁ is
+        # directly observable at the decoder's input, which makes
+        # operator-targeted weight edits actually testable.
+        self.h2 = None if single_yat else YatNMN(hidden, hidden, rngs=rngs)
         self.decoder = Decoder(hidden, rngs=rngs)
 
         self.aux_sym = nnx.Linear(emb_dim, NUM_SYMBOLS, rngs=rngs)
@@ -174,7 +179,7 @@ class YatArithmeticGen(nnx.Module):
         eb = self.encoder(img_b)
         h = jnp.concatenate([ea, eo, eb], axis=-1)
         t1 = self.h1(h)
-        t2 = self.h2(t1)
+        t2 = t1 if self.h2 is None else self.h2(t1)
         return ea, eo, eb, h, t1, t2
 
     # ------------------------------------------------------------------ infer
