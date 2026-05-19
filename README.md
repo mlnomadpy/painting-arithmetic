@@ -94,7 +94,7 @@ Per-operator (single-digit operands, results in `[−9, 81]`):
 
 > The trunk between encoder and decoder is **only 256-d and supervised symbolically** (per-slot CE on sign / tens / units + CRT residues). That makes the interior legible.
 
-- **Operator regions in latent space.** PCA of the post-`h₂` trunk shows the four operators occupy four distinct regions and, inside each region, the integer result moves smoothly along a direction. The trunk has learned a value line per operator.
+- **Operator regions in latent space.** PCA of the post-`h₁` trunk shows the four operators occupy four distinct regions and, inside each region, the integer result moves smoothly along a direction. The trunk has learned a value line per operator.
 - **Operator-as-shift.** For every pair of operators, the top singular value of the trunk-difference matrix across the 10×10 `(a, b)` grid captures **62–76 %** of the variance. The difference between any two operators is dominated by *one direction* in the 256-d trunk &mdash; a small-model reproduction of the "geometric calculator" pattern found by [Goodfire AI](https://www.goodfire.ai/research/a-geometric-calculator) inside Llama 3.1-8B.
 - **Slot-localised painter units.** Pushing one-hot vectors through the trained decoder yields a per-unit "footprint" image. Many trunk units are dedicated *sign-slot painters*, *tens-slot painters*, or *units-slot painters* &mdash; the decoder has carved itself into a slot alphabet.
 - **Yat prototypes are interpretable.** Each row of `h₁`'s weight matrix splits into three 64-d slots that match the three encoder embeddings. About **20 % of `h₁` units** have an operator-class prototype in their middle slot &mdash; those are the operator-conditioned arithmetic units.
@@ -211,14 +211,13 @@ flowchart LR
     O[img_op<br/>28×28]:::input --> E
     B[img_b<br/>28×28]:::input --> E
     E[Shared<br/>SymbolEncoder]:::block --> EM[e_a · e_op · e_b<br/>3 × 64-d]:::vec
-    EM --> H1["YatNMN h₁<br/>ℝ¹⁹² → ℝ²⁵⁶"]:::block
-    H1 --> H2["YatNMN h₂<br/>ℝ²⁵⁶ → ℝ²⁵⁶ <b>trunk t</b>"]:::trunk
-    H2 --> D[Decoder<br/>linear + 2× ConvTranspose]:::block
+    EM --> H1["YatNMN h₁<br/>ℝ¹⁹² → ℝ²⁵⁶ <b>trunk t</b>"]:::trunk
+    H1 --> D[Decoder<br/>linear + 2× ConvTranspose]:::block
     D --> OUT["img_out<br/>28 × 84<br/>sign · tens · units"]:::output
 
     E -. aux_sym 14-way .-> AUX1[ ]:::aux
-    H2 -. mod 2 / 5 / 11 / sign .-> AUX2[ ]:::aux
-    H2 -. slot sign / tens / units .-> AUX3[ ]:::aux
+    H1 -. mod 2 / 5 / 11 / sign .-> AUX2[ ]:::aux
+    H1 -. slot sign / tens / units .-> AUX3[ ]:::aux
 
     classDef input fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
     classDef block fill:#fef3c7,stroke:#d97706,color:#78350f;
@@ -229,7 +228,7 @@ flowchart LR
 ```
 
 - **Encoder.** Shared across all three input slots. Two variants &mdash; `StockEncoder` (stock `Conv + GELU`, **default and validated** at 96.91 % OCR) or `YatEncoder` (every conv is a `YatConv` rational kernel; experimental, currently underperforms at the same recipe). Both end with global average pool → linear → 64-d embedding.
-- **Trunk.** Two `YatNMN` layers (`192 → 256 → 256`). The Yat kernel computes <code>α(x·W + b)² / (‖x − W‖² + ε)</code>, which makes each row of `W` a literal prototype point in input space. That's what makes the prototype-gallery interpretability work.
+- **Trunk.** A single `YatNMN` layer (`192 → 256`) &mdash; the "v3-thin" single-Yat variant used for interpretability and shipped in the demo. The Yat kernel computes <code>α(x·W + b)² / (‖x − W‖² + ε)</code>, which makes each row of `W` a literal prototype point in input space. That's what makes the prototype-gallery interpretability work. (A two-layer trunk variant exists behind `--phase joint` without `--single-yat` but is not the deployed model.)
 - **Decoder.** Linear projection → 16×7×21 feature map → two `ConvTranspose` upsamples → `Conv → sigmoid` → 28×84 image.
 - **Auxiliary heads (training only).** A 14-way symbol classifier on each input embedding; modular CRT classifiers (mod 2, mod 5, mod 11, sign) on the trunk; per-slot classifiers (sign, tens, units) on the trunk. The per-slot CE is the load-bearing fix for the multi-digit collapse failure mode &mdash; removing it costs about 34 OCR points.
 
@@ -274,13 +273,13 @@ That separation is what makes the trunk legible afterwards: it is shaped by symb
 - PCA on `t` over the 4 × 10 × 10 grid of `(op, a, b)` shows four operator-specific regions, each with a smooth value line in the integer result.
 - For every pair of operators, the trunk-difference matrix across `(a, b)` is rank-1 to first order: the top singular value captures 62 to 76 percent of variance, mirroring the "geometric calculator" finding from Goodfire AI in Llama 3.1-8B.
 - Pushing one-hot trunk vectors through the trained decoder yields per-unit "footprint" images. Most units paint into a fixed column (sign / tens / units), so the decoder has carved itself into a slot alphabet.
-- Inspecting `h₁`'s weight matrix row by row: every row splits into three 64-d slots aligned with the three encoder embeddings. About 20 percent of units carry an operator-class prototype in their middle slot.
+- Inspecting `h₁`'s weight matrix row by row: every row splits into three 64-d slots aligned with the three encoder embeddings (`e_a`, `e_op`, `e_b`). About 20 percent of units carry an operator-class prototype in their middle slot.
 
 ### 3 &middot; Edit the model
 
 > **Goal.** Do surgery on the model with math, not retraining.
 
-- `experiments/intervene.py`: zero the kernel columns of operator-tagged units in `h₁`. RKHS-preserving weight edits that delete one operator while keeping the others.
+- `experiments/intervene.py`: zero the kernel columns of operator-tagged units in `h₁` (the single Yat trunk layer). RKHS-preserving weight edits that delete one operator while keeping the others.
 - `scripts/compute_interp_assets.py`: tag each of the 256 trunk units by which operator activates it most purely (on the offline `(op, a, b)` grid), and compute the four operator centroids + their SVD basis for INLP-style concept-erasure projections.
 
 ### 4 &middot; Make it interactive
