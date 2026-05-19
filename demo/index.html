@@ -3,13 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Painting Arithmetic — live demo</title>
+<title>Painting Arithmetic — interpretability demo</title>
 <style>
   :root {
     --bg: #0f1115; --panel: #151821; --panel-2: #1c2030;
     --ink: #e6e8ee; --muted: #9aa3b2;
     --accent: #ffb86b; --accent-2: #8be9fd;
     --good: #a5e075; --bad: #ff7a7a;
+    --op-plus:  #ffb86b;
+    --op-minus: #8be9fd;
+    --op-times: #ff7a7a;
+    --op-div:   #a5e075;
     --line: #2a2f3d;
     --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   }
@@ -17,18 +21,22 @@
   html, body { background: var(--bg); color: var(--ink); margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     line-height: 1.55; -webkit-font-smoothing: antialiased; }
-  body { max-width: 1080px; margin: 0 auto; padding: 32px 24px 96px; }
+  body { max-width: 1080px; margin: 0 auto; padding: 28px 24px 96px; }
   h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
-  .lede { color: var(--muted); margin: 0 0 12px; }
-  code, .mono { font-family: var(--mono); font-size: 13.5px; }
+  h2 { font-size: 15px; margin: 0 0 8px; letter-spacing: 0.02em;
+       text-transform: uppercase; color: var(--accent); font-family: var(--mono); }
+  .lede { color: var(--muted); margin: 0 0 14px; }
+  .hint { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; }
+  code, .mono { font-family: var(--mono); font-size: 13px; }
   .pill { display: inline-block; padding: 2px 10px; border-radius: 999px;
           font-size: 12px; background: var(--panel-2); color: var(--accent-2);
           border: 1px solid var(--line); margin-bottom: 12px; }
+  a { color: var(--accent-2); }
 
   .stage {
     display: flex; gap: 14px; align-items: center; justify-content: center;
     flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line);
-    border-radius: 12px; padding: 22px 18px; margin: 12px 0 14px;
+    border-radius: 12px; padding: 18px 16px; margin: 8px 0 14px;
   }
   .cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .cell label { font-size: 11px; color: var(--muted); font-family: var(--mono);
@@ -37,51 +45,122 @@
     background: #000; border-radius: 12px; border: 1px solid #222;
     box-shadow: inset 0 0 0 1px #2c2c2c;
     touch-action: none; cursor: crosshair; image-rendering: pixelated;
+    width: 168px; height: 168px;
   }
-  .arrow { color: var(--muted); font-size: 28px; padding: 0 4px; }
+  .arrow { color: var(--muted); font-size: 22px; padding: 0 2px; }
   canvas.out {
-    width: 504px; height: 168px; background: #000; border-radius: 12px;
+    width: 420px; height: 140px; background: #000; border-radius: 12px;
     border: 1px solid #2c3a55; box-shadow: inset 0 0 0 1px #2c2c2c;
     image-rendering: pixelated;
   }
   .ocr {
-    font-family: var(--mono); color: var(--good); font-size: 36px;
-    font-weight: 700; line-height: 1; padding-top: 6px;
+    font-family: var(--mono); color: var(--good); font-size: 30px;
+    font-weight: 700; line-height: 1; padding-top: 4px;
   }
   .glyph-row { display: flex; gap: 6px; justify-content: center;
-               margin-bottom: 14px; flex-wrap: wrap; }
+               margin-bottom: 12px; flex-wrap: wrap; }
   .glyph-row .label { color: var(--muted); font-family: var(--mono); font-size: 12px;
                       align-self: center; padding-right: 4px; }
   .glyph-row button {
     background: var(--panel-2); color: var(--ink); border: 1px solid var(--line);
     font-family: var(--mono); font-size: 18px; font-weight: 700;
-    width: 44px; height: 44px; border-radius: 8px; cursor: pointer;
+    width: 40px; height: 40px; border-radius: 8px; cursor: pointer;
   }
-  .controls { display: flex; gap: 10px; justify-content: center;
+  .controls { display: flex; gap: 8px; justify-content: center;
               margin-bottom: 12px; flex-wrap: wrap; }
-  .controls button {
+  .controls button, .row button {
     background: var(--panel-2); color: var(--ink); border: 1px solid var(--line);
-    padding: 10px 14px; border-radius: 8px; cursor: pointer; font-size: 14px;
+    padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px;
     font-family: inherit;
   }
-  .controls .primary {
+  .controls .primary, .row .primary {
     background: var(--accent); color: #1a1a1a; border-color: var(--accent);
     font-weight: 600;
   }
+  button.on { background: var(--bad); border-color: var(--bad); color: #1a1a1a; font-weight: 600; }
+  button.muted { opacity: 0.7; }
   .status { color: var(--muted); font-family: var(--mono); font-size: 12px;
-            min-height: 18px; text-align: center; }
+            min-height: 18px; text-align: center; margin-bottom: 8px; }
+  .status.bad { color: var(--bad); }
   .footer { color: var(--muted); font-size: 12px; margin-top: 32px;
             text-align: center; font-family: var(--mono); }
-  .badge { color: var(--bad); }
+
+  /* ---- intervention panels ---- */
+  .panels {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    margin-top: 18px;
+  }
+  @media (max-width: 760px) { .panels { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px 14px 12px;
+  }
+  .panel.wide { grid-column: 1 / -1; }
+  .panel .desc { color: var(--muted); font-size: 12.5px; margin: 0 0 10px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+         margin-bottom: 6px; }
+  .row .grow { flex: 1; }
+  .row input[type=range] { flex: 1; min-width: 120px; }
+  .badge {
+    background: var(--panel-2); border: 1px solid var(--line);
+    padding: 2px 8px; border-radius: 999px; font-family: var(--mono);
+    font-size: 12px; color: var(--muted);
+  }
+  .badge.live { color: var(--good); }
+  .badge.warn { color: var(--bad); }
+
+  /* lesion grid: 16×16 of 256 units */
+  .lesionGrid {
+    display: grid; grid-template-columns: repeat(16, 1fr); gap: 2px;
+    background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px;
+    aspect-ratio: 1 / 1;
+  }
+  .lesionGrid .u {
+    aspect-ratio: 1 / 1; border-radius: 3px; cursor: pointer;
+    background: #2a2f3d; border: 1px solid transparent;
+    transition: transform 0.05s ease;
+  }
+  .lesionGrid .u:hover { transform: scale(1.18); border-color: var(--ink); }
+  .lesionGrid .u.dead { background: #000 !important; opacity: 0.35; }
+  .lesionGrid .u[data-op="+"] { background: var(--op-plus); }
+  .lesionGrid .u[data-op="−"] { background: var(--op-minus); }
+  .lesionGrid .u[data-op="×"] { background: var(--op-times); }
+  .lesionGrid .u[data-op="÷"] { background: var(--op-div); }
+
+  .legend { display: flex; gap: 10px; align-items: center; justify-content: center;
+            margin-top: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted);
+            font-family: var(--mono); }
+  .legend .sw { width: 12px; height: 12px; border-radius: 3px;
+                display: inline-block; vertical-align: middle; margin-right: 4px; }
+
+  .opbtn { display: flex; flex-direction: column; align-items: center; gap: 2px;
+           min-width: 84px; }
+  .opbtn .glyph { font-size: 18px; font-weight: 700; font-family: var(--mono); }
+  .opbtn .sub { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .opbtn.on .sub { color: #1a1a1a; }
+
+  .toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px;
+            overflow: hidden; background: var(--panel-2); }
+  .toggle button { background: transparent; border: none; padding: 6px 10px;
+                   font-family: var(--mono); font-size: 12px; color: var(--muted);
+                   cursor: pointer; }
+  .toggle button.on { background: var(--accent); color: #1a1a1a; }
 </style>
 </head>
 <body>
 
-<span class="pill">painting-arithmetic · live</span>
-<h1>The model paints its answer</h1>
-<p class="lede">Three drawing pads → shared CNN encoder → Yat trunk →
-ConvTranspose decoder → a 28×84 image of the result. Pure latent space,
-no softmax. JAX-trained, ONNX-served in your browser.</p>
+<span class="pill">painting-arithmetic · interpretability live</span>
+<h1>Watch the network forget how to count</h1>
+<p class="lede">
+The model paints its answer through a 256-d trunk vector
+<code>t</code> sitting between the shared CNN encoder and the
+ConvTranspose decoder. Below the stage, seven knowledge-removal
+interventions edit <code>t</code> (or its inputs) before decoding:
+zero individual units, ablate the circuit responsible for an entire
+operator, project out the operator subspace INLP-style. The model
+re-paints in real time after every change.
+</p>
 
 <div class="stage">
   <div class="cell">
@@ -113,25 +192,150 @@ no softmax. JAX-trained, ONNX-served in your browser.</p>
 </div>
 
 <div class="controls">
-  <button class="primary" id="btnPredict">Predict</button>
+  <button class="primary" id="btnPredict">Re-encode</button>
   <button id="btnClearA">Clear A</button>
   <button id="btnClearOp">Clear op</button>
   <button id="btnClearB">Clear B</button>
+  <button id="btnReset">Reset interventions</button>
 </div>
-<div class="status" id="status">loading model…</div>
+<div class="status" id="status">loading…</div>
 
-<p class="footer">model: <code>./model.onnx</code>  ·
-code: <a style="color:var(--accent-2)" href="https://github.com/mlnomadpy/painting-arithmetic">github.com/mlnomadpy/painting-arithmetic</a></p>
+<!-- ============ INTERVENTION PANELS ============ -->
+
+<div class="panels">
+
+  <!-- 1. Unit lesion grid -->
+  <div class="panel wide">
+    <h2>1 · unit lesion grid</h2>
+    <p class="desc">
+      Each of 256 cells is one trunk unit, coloured by the operator it most
+      activates for (tagged offline on a 4×10×10 grid of digit pairs).
+      Click a cell to set <code>t[u]&nbsp;=&nbsp;0</code> and re-decode.
+      Watch which units are load-bearing for which operator.
+    </p>
+    <div id="lesionGrid" class="lesionGrid"></div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--op-plus)"></span>+ units</span>
+      <span><span class="sw" style="background:var(--op-minus)"></span>− units</span>
+      <span><span class="sw" style="background:var(--op-times)"></span>× units</span>
+      <span><span class="sw" style="background:var(--op-div)"></span>÷ units</span>
+      <span>killed: <span class="badge live" id="killCount">0 / 256</span></span>
+    </div>
+  </div>
+
+  <!-- 2. Operator-circuit lesion -->
+  <div class="panel">
+    <h2>2 · operator-circuit lesion</h2>
+    <p class="desc">
+      Zero every trunk unit tagged to an operator. The network forgets
+      how to perform that operation while staying competent at the others.
+    </p>
+    <div class="row" id="opKillRow"></div>
+  </div>
+
+  <!-- 3. Random vs surgical baseline -->
+  <div class="panel">
+    <h2>3 · random vs surgical</h2>
+    <p class="desc">
+      Kill the same number of units two ways: ranked by operator-purity
+      (surgical) vs uniformly at random. Surgical lesions wreck a single
+      operator; random lesions just degrade everything a little.
+    </p>
+    <div class="row">
+      <div class="toggle" id="ablMode">
+        <button data-mode="surgical" class="on">surgical</button>
+        <button data-mode="random">random</button>
+      </div>
+      <span class="grow"></span>
+      <button id="ablShuffle" class="muted">re-roll</button>
+    </div>
+    <div class="row">
+      <span class="badge mono">N</span>
+      <input type="range" id="ablN" min="0" max="64" value="0" step="1">
+      <span class="badge live" id="ablBadge">0</span>
+    </div>
+  </div>
+
+  <!-- 4. Cumulative purity slider -->
+  <div class="panel">
+    <h2>4 · cumulative purity slider</h2>
+    <p class="desc">
+      Kill the top-k most operator-pure units globally (across all
+      operators). Past ~80 the model collapses into garbage strokes —
+      the trunk is mostly operator-tagged.
+    </p>
+    <div class="row">
+      <span class="badge mono">k</span>
+      <input type="range" id="cumK" min="0" max="256" value="0" step="1">
+      <span class="badge live" id="cumBadge">0</span>
+    </div>
+  </div>
+
+  <!-- 5. Slot blinding -->
+  <div class="panel">
+    <h2>5 · input-slot blinding</h2>
+    <p class="desc">
+      Black out one input image — the slot's 64-d embedding collapses to
+      "blank canvas" features. The model still tries to paint, but with
+      one slot it's hallucinating.
+    </p>
+    <div class="row" id="blindRow">
+      <button data-slot="a">Blind to A</button>
+      <button data-slot="op">Blind to op</button>
+      <button data-slot="b">Blind to B</button>
+    </div>
+  </div>
+
+  <!-- 6. INLP per-op erasure -->
+  <div class="panel">
+    <h2>6 · INLP per-op erasure</h2>
+    <p class="desc">
+      Project <code>t</code> orthogonal to one operator's centroid
+      direction. The unit cells stay alive; the model loses the
+      <em>concept</em> of "this is operator X" along that axis.
+    </p>
+    <div class="row" id="inlpRow"></div>
+  </div>
+
+  <!-- 7. Rank-k subspace erasure -->
+  <div class="panel">
+    <h2>7 · rank-k operator-subspace erasure</h2>
+    <p class="desc">
+      INLP all the way: SVD the centred operator centroids and project
+      out the top-<code>k</code> singular directions. <code>k = 3</code>
+      kills the full operator subspace (only 3 d.o.f. for 4 ops).
+      <code>+</code> and <code>×</code> converge to the same painted result.
+    </p>
+    <div class="row">
+      <span class="badge mono">k</span>
+      <input type="range" id="rkK" min="0" max="3" value="0" step="1">
+      <span class="badge live" id="rkBadge">0</span>
+    </div>
+  </div>
+
+</div>
+
+<p class="footer">
+  encode: <code>./encode.onnx</code> · decode: <code>./decode.onnx</code> ·
+  tags: <code>./op_units.json</code> · directions: <code>./op_directions.json</code>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/mlnomadpy/painting-arithmetic">github.com/mlnomadpy/painting-arithmetic</a>
+</p>
 
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.js"></script>
 <script>
 const OP_GLYPHS = ["+", "−", "×", "÷"];
 const MNIST_MEAN = 0.1307, MNIST_STD = 0.3081;
 
+// ─────────────────────────────────────────────────────────────────────────
+// Drawing pad
+// ─────────────────────────────────────────────────────────────────────────
 class Pad {
   constructor(canvas, onChange) {
-    this.canvas = canvas; this.ctx = canvas.getContext("2d", { willReadFrequently: true });
-    this.onChange = onChange; this.drawing = false; this.dirty = false;
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d", { willReadFrequently: true });
+    this.onChange = onChange;
+    this.drawing = false; this.dirty = false;
     this.clear();
     canvas.addEventListener("pointerdown", e => this._start(e));
     canvas.addEventListener("pointermove", e => this._move(e));
@@ -205,7 +409,9 @@ class Pad {
   isEmpty() { return !this.dirty; }
 }
 
-// Render target images for OCR (nearest-neighbour over 91 canonicals).
+// ─────────────────────────────────────────────────────────────────────────
+// OCR via nearest-neighbour over 91 canonical 28×84 result images
+// ─────────────────────────────────────────────────────────────────────────
 function renderGlyph28(text) {
   const c = document.createElement("canvas"); c.width = 28; c.height = 28;
   const ctx = c.getContext("2d");
@@ -255,48 +461,154 @@ function drawFloat(canvas, arr, w, h) {
   ctx.putImageData(img, 0, 0);
 }
 
-let session = null;
+// ─────────────────────────────────────────────────────────────────────────
+// State and assets
+// ─────────────────────────────────────────────────────────────────────────
+let encSess = null, decSess = null;
+let opUnits = null;      // {units: {op: [{u,p,act}...]}, ops, mean_per_op}
+let directions = null;   // {ops, pairs, inlp_basis, inlp_sv, mean_t, op_centroids}
+let trunkBase = null;    // Float32Array(256) — last encode result
+let unitTag = new Array(256).fill(null);  // u -> op string
+let killed = new Set();  // surgical lesion (single units + op-kills + cumulative)
+let ablKilled = new Set();   // random/surgical baseline (panel 3)
+let blinded = { a: false, op: false, b: false };
+let inlpOps = new Set(); // operators whose direction is erased (panel 6)
+let rkK = 0;             // rank-k subspace erasure (panel 7)
+let ablMode = "surgical";
+
 function describeError(e) {
   if (e == null) return "unknown";
   if (typeof e === "string") return e;
   if (e instanceof Error) return e.message || e.name || String(e);
   try { return JSON.stringify(e); } catch (_) { return String(e); }
 }
-async function loadModel() {
+
+async function loadAssets() {
   const $s = document.getElementById("status");
   try {
     ort.env.wasm.numThreads = 1;
     ort.env.logLevel = "warning";
     ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/";
-    $s.textContent = "fetching model…";
-    const resp = await fetch("./model.onnx");
-    if (!resp.ok) throw new Error("fetch " + resp.status + " " + resp.statusText);
-    const buf = new Uint8Array(await resp.arrayBuffer());
-    $s.textContent = "initialising runtime (" + (buf.length >> 20) + " MB)…";
-    session = await ort.InferenceSession.create(buf, { executionProviders: ["wasm"] });
+    $s.textContent = "fetching assets…";
+    const [encBuf, decBuf, unitsTxt, dirsTxt] = await Promise.all([
+      fetch("./encode.onnx").then(r => r.arrayBuffer()),
+      fetch("./decode.onnx").then(r => r.arrayBuffer()),
+      fetch("./op_units.json").then(r => r.text()),
+      fetch("./op_directions.json").then(r => r.text()),
+    ]);
+    opUnits = JSON.parse(unitsTxt);
+    directions = JSON.parse(dirsTxt);
+    for (const op of opUnits.ops) {
+      for (const e of opUnits.units[op]) unitTag[e.u] = op;
+    }
+    $s.textContent = "initialising runtime…";
+    encSess = await ort.InferenceSession.create(new Uint8Array(encBuf), { executionProviders: ["wasm"] });
+    decSess = await ort.InferenceSession.create(new Uint8Array(decBuf), { executionProviders: ["wasm"] });
     $s.textContent = "model loaded · draw something";
+    buildLesionGrid();
+    buildOpKillRow();
+    buildBlindRow();
+    buildInlpRow();
+    encodeAndDecode();
   } catch (e) {
-    console.error("loadModel failed:", e);
-    $s.textContent = "model load failed: " + describeError(e);
-    $s.className = "status badge";
+    console.error("loadAssets failed:", e);
+    $s.textContent = "load failed: " + describeError(e);
+    $s.className = "status bad";
   }
 }
 
-const padA  = new Pad(document.getElementById("padA"),  predict);
-const padOp = new Pad(document.getElementById("padOp"), predict);
-const padB  = new Pad(document.getElementById("padB"),  predict);
+// ─────────────────────────────────────────────────────────────────────────
+// Trunk pipeline
+// ─────────────────────────────────────────────────────────────────────────
+async function encodeAndDecode() {
+  if (!encSess || !decSess) return;
+  const $s = document.getElementById("status");
+  try {
+    const aTensor = blinded.a  ? blankTensor() : padA.tensor();
+    const oTensor = blinded.op ? blankTensor() : padOp.tensor();
+    const bTensor = blinded.b  ? blankTensor() : padB.tensor();
+    const ta = new ort.Tensor("float32", aTensor, [1, 1, 28, 28]);
+    const to = new ort.Tensor("float32", oTensor, [1, 1, 28, 28]);
+    const tb = new ort.Tensor("float32", bTensor, [1, 1, 28, 28]);
+    const enc = await encSess.run({ img_a: ta, img_op: to, img_b: tb });
+    trunkBase = new Float32Array(enc.mul_out_1.data);
+    await decodeWithInterventions();
+    $s.textContent = "model loaded · draw something";
+    $s.className = "status";
+  } catch (e) {
+    console.error("encode failed:", e);
+    $s.textContent = "encode failed: " + describeError(e);
+    $s.className = "status bad";
+  }
+}
 
-async function predict() {
-  if (!session) return;
-  if (padA.isEmpty() && padOp.isEmpty() && padB.isEmpty()) return;
-  const ta = new ort.Tensor("float32", padA.tensor(),  [1, 1, 28, 28]);
-  const to = new ort.Tensor("float32", padOp.tensor(), [1, 1, 28, 28]);
-  const tb = new ort.Tensor("float32", padB.tensor(),  [1, 1, 28, 28]);
+function blankTensor() {
+  const bg = (0 - MNIST_MEAN) / MNIST_STD;
+  const out = new Float32Array(28 * 28);
+  out.fill(bg);
+  return out;
+}
+
+let decodeQueued = false, decodeRunning = false;
+function queueDecode() {
+  if (decodeRunning) { decodeQueued = true; return; }
+  decodeRunning = true;
+  requestAnimationFrame(async () => {
+    try {
+      await decodeWithInterventions();
+    } finally {
+      decodeRunning = false;
+      if (decodeQueued) { decodeQueued = false; queueDecode(); }
+    }
+  });
+}
+
+async function decodeWithInterventions() {
+  if (!decSess || !trunkBase) return;
+  const t = new Float32Array(trunkBase);  // copy
+
+  // (A) unit lesions (panels 1, 2, 4 share `killed`; panel 3 stacks)
+  for (const u of killed) t[u] = 0;
+  for (const u of ablKilled) t[u] = 0;
+
+  // (B) INLP per-op erasure (panel 6)
+  if (inlpOps.size > 0) {
+    const grand = directions.op_centroids.reduce((acc, c) => acc.map((v, i) => v + c[i]),
+                                                  new Array(256).fill(0))
+                                          .map(v => v / directions.op_centroids.length);
+    for (const op of inlpOps) {
+      const idx = directions.ops.indexOf(op);
+      if (idx < 0) continue;
+      const d = directions.op_centroids[idx].map((v, i) => v - grand[i]);
+      const norm2 = d.reduce((s, v) => s + v * v, 0);
+      if (norm2 < 1e-12) continue;
+      let dot = 0; for (let i = 0; i < 256; i++) dot += t[i] * d[i];
+      const k = dot / norm2;
+      for (let i = 0; i < 256; i++) t[i] -= k * d[i];
+    }
+  }
+
+  // (C) rank-k subspace erasure (panel 7) — Gram-Schmidt-orthonormal basis
+  if (rkK > 0) {
+    const basis = directions.inlp_basis;
+    const K = Math.min(rkK, basis.length);
+    for (let r = 0; r < K; r++) {
+      const v = basis[r];
+      let dot = 0, nrm = 0;
+      for (let i = 0; i < 256; i++) { dot += t[i] * v[i]; nrm += v[i] * v[i]; }
+      if (nrm < 1e-12) continue;
+      const k = dot / nrm;
+      for (let i = 0; i < 256; i++) t[i] -= k * v[i];
+    }
+  }
+
+  const tTensor = new ort.Tensor("float32", t, [1, 256]);
   let r;
   try {
-    r = await session.run({ img_a: ta, img_op: to, img_b: tb });
+    r = await decSess.run({ t: tTensor });
   } catch (e) {
-    document.getElementById("status").textContent = "inference failed: " + e.message;
+    document.getElementById("status").textContent = "decode failed: " + describeError(e);
+    document.getElementById("status").className = "status bad";
     return;
   }
   const img = new Float32Array(r.img.data);
@@ -304,17 +616,195 @@ async function predict() {
   document.getElementById("ocrText").textContent = String(ocr(img));
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// UI builders
+// ─────────────────────────────────────────────────────────────────────────
+function buildLesionGrid() {
+  const g = document.getElementById("lesionGrid");
+  g.innerHTML = "";
+  for (let u = 0; u < 256; u++) {
+    const cell = document.createElement("div");
+    cell.className = "u";
+    const op = unitTag[u];
+    if (op) cell.dataset.op = op;
+    cell.title = `unit ${u}` + (op ? ` (${op})` : "");
+    cell.addEventListener("click", () => {
+      if (killed.has(u)) killed.delete(u); else killed.add(u);
+      cell.classList.toggle("dead", killed.has(u));
+      updateKillCount(); queueDecode();
+    });
+    g.appendChild(cell);
+  }
+  updateKillCount();
+}
+function updateKillCount() {
+  document.getElementById("killCount").textContent = `${killed.size} / 256`;
+}
+function repaintLesionCells() {
+  const g = document.getElementById("lesionGrid");
+  for (let u = 0; u < 256; u++) {
+    g.children[u].classList.toggle("dead", killed.has(u));
+  }
+  updateKillCount();
+}
+
+function buildOpKillRow() {
+  const row = document.getElementById("opKillRow");
+  row.innerHTML = "";
+  for (const op of opUnits.ops) {
+    const n = opUnits.units[op].length;
+    const b = document.createElement("button");
+    b.className = "opbtn";
+    b.innerHTML = `<span class="glyph">${op}</span><span class="sub">${n} units</span>`;
+    b.dataset.op = op;
+    b.addEventListener("click", () => {
+      const allKilled = opUnits.units[op].every(e => killed.has(e.u));
+      for (const e of opUnits.units[op]) {
+        if (allKilled) killed.delete(e.u); else killed.add(e.u);
+      }
+      b.classList.toggle("on", !allKilled);
+      repaintLesionCells(); queueDecode();
+    });
+    row.appendChild(b);
+  }
+}
+
+function buildBlindRow() {
+  const row = document.getElementById("blindRow");
+  row.querySelectorAll("button").forEach(b => {
+    b.addEventListener("click", () => {
+      const slot = b.dataset.slot;
+      blinded[slot] = !blinded[slot];
+      b.classList.toggle("on", blinded[slot]);
+      encodeAndDecode();
+    });
+  });
+}
+
+function buildInlpRow() {
+  const row = document.getElementById("inlpRow");
+  row.innerHTML = "";
+  for (const op of directions.ops) {
+    const b = document.createElement("button");
+    b.className = "opbtn";
+    b.innerHTML = `<span class="glyph">erase ${op}</span><span class="sub">−1 axis</span>`;
+    b.addEventListener("click", () => {
+      if (inlpOps.has(op)) inlpOps.delete(op); else inlpOps.add(op);
+      b.classList.toggle("on", inlpOps.has(op));
+      queueDecode();
+    });
+    row.appendChild(b);
+  }
+}
+
+// Random / surgical baseline (panel 3)
+function rebuildAblBaseline(n) {
+  ablKilled = new Set();
+  const max = Math.min(n, 256);
+  if (ablMode === "random") {
+    const pool = [];
+    for (let i = 0; i < 256; i++) pool.push(i);
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    for (let i = 0; i < max; i++) ablKilled.add(pool[i]);
+  } else {
+    // surgical: top-k purity across all units (regardless of operator)
+    const ranked = [];
+    for (const op of opUnits.ops) for (const e of opUnits.units[op]) ranked.push(e);
+    ranked.sort((x, y) => y.p - x.p);
+    for (let i = 0; i < max; i++) ablKilled.add(ranked[i].u);
+  }
+  document.getElementById("ablBadge").textContent = `${ablKilled.size}`;
+  // Reflect on grid: ablKilled cells get a transient "dead" look too, but
+  // they live separately. Combine visually:
+  const g = document.getElementById("lesionGrid");
+  for (let u = 0; u < 256; u++) {
+    g.children[u].classList.toggle("dead", killed.has(u) || ablKilled.has(u));
+  }
+  queueDecode();
+}
+
+// Cumulative slider (panel 4)
+function rebuildCumulative(k) {
+  // Remove any units previously added by this panel and re-add fresh top-k.
+  // Use a side-set to track "added by cumulative" so we don't trample manual clicks.
+  for (const u of cumAdded) killed.delete(u);
+  cumAdded.clear();
+  const ranked = [];
+  for (const op of opUnits.ops) for (const e of opUnits.units[op]) ranked.push(e);
+  ranked.sort((x, y) => y.p - x.p);
+  const kk = Math.min(k, ranked.length);
+  for (let i = 0; i < kk; i++) {
+    killed.add(ranked[i].u);
+    cumAdded.add(ranked[i].u);
+  }
+  document.getElementById("cumBadge").textContent = String(kk);
+  repaintLesionCells(); queueDecode();
+}
+const cumAdded = new Set();
+
+// ─────────────────────────────────────────────────────────────────────────
+// Wiring
+// ─────────────────────────────────────────────────────────────────────────
+const padA  = new Pad(document.getElementById("padA"),  encodeAndDecode);
+const padOp = new Pad(document.getElementById("padOp"), encodeAndDecode);
+const padB  = new Pad(document.getElementById("padB"),  encodeAndDecode);
+
 document.querySelectorAll(".glyph-row button").forEach(b =>
   b.addEventListener("click", () => padOp.paintGlyph(+b.dataset.op)));
-document.getElementById("btnPredict").addEventListener("click", predict);
+document.getElementById("btnPredict").addEventListener("click", encodeAndDecode);
 document.getElementById("btnClearA").addEventListener("click",
-  () => { padA.clear(); document.getElementById("ocrText").textContent = "·"; });
+  () => { padA.clear(); encodeAndDecode(); });
 document.getElementById("btnClearOp").addEventListener("click",
-  () => { padOp.clear(); document.getElementById("ocrText").textContent = "·"; });
+  () => { padOp.clear(); encodeAndDecode(); });
 document.getElementById("btnClearB").addEventListener("click",
-  () => { padB.clear(); document.getElementById("ocrText").textContent = "·"; });
+  () => { padB.clear(); encodeAndDecode(); });
 
-loadModel();
+document.getElementById("btnReset").addEventListener("click", () => {
+  killed.clear(); cumAdded.clear(); ablKilled.clear();
+  inlpOps.clear(); rkK = 0;
+  blinded = { a: false, op: false, b: false };
+  for (const slot of ["a", "op", "b"]) {
+    const b = document.querySelector(`#blindRow button[data-slot="${slot}"]`);
+    if (b) b.classList.remove("on");
+  }
+  document.querySelectorAll("#opKillRow button").forEach(b => b.classList.remove("on"));
+  document.querySelectorAll("#inlpRow button").forEach(b => b.classList.remove("on"));
+  document.getElementById("cumK").value = 0;
+  document.getElementById("cumBadge").textContent = "0";
+  document.getElementById("ablN").value = 0;
+  document.getElementById("ablBadge").textContent = "0";
+  document.getElementById("rkK").value = 0;
+  document.getElementById("rkBadge").textContent = "0";
+  repaintLesionCells();
+  encodeAndDecode();
+});
+
+document.getElementById("ablMode").querySelectorAll("button").forEach(b => {
+  b.addEventListener("click", () => {
+    ablMode = b.dataset.mode;
+    document.getElementById("ablMode").querySelectorAll("button")
+      .forEach(x => x.classList.toggle("on", x.dataset.mode === ablMode));
+    rebuildAblBaseline(+document.getElementById("ablN").value);
+  });
+});
+document.getElementById("ablShuffle").addEventListener("click",
+  () => rebuildAblBaseline(+document.getElementById("ablN").value));
+document.getElementById("ablN").addEventListener("input", e =>
+  rebuildAblBaseline(+e.target.value));
+
+document.getElementById("cumK").addEventListener("input", e =>
+  rebuildCumulative(+e.target.value));
+
+document.getElementById("rkK").addEventListener("input", e => {
+  rkK = +e.target.value;
+  document.getElementById("rkBadge").textContent = String(rkK);
+  queueDecode();
+});
+
+loadAssets();
 </script>
 </body>
 </html>
